@@ -146,17 +146,17 @@ def add(self, new_character: Characters) -> Characters:
 from pydantic import BaseModel, ConfigDict, Field
 
 class AddCharacterDto(BaseModel):
-    name: str = Field(min_length=3, max_length=50)
+    name: Annotated[str, Field(min_length=3, max_length=50)]
     role: CharacterRoleEnum
-    hit_points: int = Field(gt=0, lt=101)
-    attack: int = Field(ge=5, le=20)
-    defence: int = Field(ge=5, le=20)
-    magic: int = Field(ge=5, le=20)
+    hit_points: Annotated[int, Field(gt=0, lt=101)]
+    attack: Annotated[int, Field(ge=5, le=20)]
+    defence: Annotated[int, Field(ge=5, le=20)]
+    magic: Annotated[int, Field(ge=5, le=20)]
 
 
 class GetCharacterDto(AddCharacterDto):
     model_config = ConfigDict(from_attributes=True)
-    id: int = Field(gt=0)
+    id: Annotated[int, Field(gt=0)]
 
 - update "/services/CharacterService.py"
 from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto
@@ -173,4 +173,85 @@ from .dtos.character_dtos import AddCharacterDto, GetCharacterDto
 async def add_character(new_character: AddCharacterDto, character_service: Annotated[CharacterService, Depends(CharacterService)]) -> GetCharacterDto:
     result = character_service.add(new_character=new_character)
     return result
+
+- we can have example data for any dto add following code to AddCharacterDto
+model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Bell",
+                    "role": "Mage",
+                    "hit_points": 100,
+                    "attack": 15,
+                    "defence": 10,
+                    "magic": 5
+                }
+            ]
+        }
+    }
+
+- then we can change the http status code of post api to 201 add following code
+@app.post("/", status_code=201)
+
+- we can also use status which import from fastapi we will get code hint!
+@app.post("/", status_code=status.HTTP_201_CREATED)
+
+- new we will create get by id start from repository
+def read_by_id(self, character_id: int) -> Characters | None:
+        return self.db.query(Characters).filter(Characters.id == character_id).first()
+
+- next service
+def read_by_id(self, character_id: int) -> GetCharacterDto:
+        db_character = self.repo.read_by_id(character_id=character_id)
+        if db_character is None:
+            raise HTTPException(status_code=404, detail=f"Character id: {character_id} not found")
+        return GetCharacterDto.model_validate(db_character)
+
+- then main.py
+@app.get("/{character_id}")
+async def read_character_by_id(character_id: int, character_service: Annotated[CharacterService, Depends(CharacterService)]):
+    return character_service.read_by_id(character_id=character_id)
+
+- try add more functionality of read_by_id
+- add Http response 200
+@app.get("/{character_id}", status_code=200)
+- add path validation gt =0
+character_id: Annotated[int, Path(gt=0)]
+
+- next we will improve get all but we need other thing first
+
+- add skip and take query parameter as dependencies in dependencies.py
+async def page_parameters(skip: int = 0, limit: int = 25):
+    return {"skip": skip, "limit": limit}
+- now i think we need pydantic model for skip and take create request_dtos.py
+from pydantic import BaseModel
+
+
+class PageDto(BaseModel):
+    skip: int = 0
+    limit: int = 25
+
+- update page_parameters in dependencies.py
+async def page_parameters(skip: int = 0, limit: int = 25) -> PageDto:
+    return PageDto(**{"skip": skip, "limit": limit})
+
+- and make it as dependency
+page_dependency = Annotated[PageDto, Depends(page_parameters)]
+
+- update repo to have skip and limit
+def read_all(self, skip: int, limit: int) -> list[Characters]:
+        return self.db.query(Characters).offset(skip).limit(limit).all()
+
+- fix service to map character to GetCharacterDto and use pageDto
+def read_all(self, page_dto: PageDto) -> list[GetCharacterDto]:
+        db_characters = self.repo.read_all(page_dto.skip, page_dto.limit)
+        characters = list[GetCharacterDto]()
+        for db_character in db_characters:
+            characters.append(GetCharacterDto.model_validate(db_character))
+        return characters
+
+- use page_dependency on get_all route
+@app.get("/")
+async def read_all_character(page_dtos: page_dependency, character_service: Annotated[CharacterService, Depends(CharacterService)]) -> list[GetCharacterDto]:
+    return character_service.read_all(page_dtos)
 
