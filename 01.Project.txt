@@ -1,0 +1,176 @@
+- Create new Project
+- Install sql alchemy "pip install sqlalchemy"
+- Install postgres lib "pip install psycopg2"
+- Create file database.py   
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://user:password@host:port/dbname"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={
+                       "check_same_thread": False})
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+#autocommit deafult = false อยู่แล้ว
+
+Base = declarative_base()
+
+- Create models.py file
+
+from .database import Base
+from sqlalchemy import Column, Integer, String, Enum
+from .dtos.character_dtos import CharacterRoleEnum
+
+
+class Characters(Base):
+    __tablename__ = "characters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False)
+    role = Column(type_=Enum(CharacterRoleEnum, name="character_role"))
+    hit_points = Column(Integer)
+    attack = Column(Integer)
+    defence = Column(Integer)
+    magic = Column(Integer)
+
+
+- Create "dtos/character_dto.py"
+from enum import Enum
+
+
+class CharacterRoleEnum(str, Enum):
+    Knight = "Knight"
+    Cleric = "Cleric"
+    Mage = "Mage"
+
+
+
+- Create main.py
+
+from fastapi import FastAPI
+from . import models
+from .database import engine
+
+app = FastAPI()
+
+models.Base.metadata.create_all(bind=engine)
+- Change database config 
+SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://postgres:kkndqbjhrrew@localhost:5432/python_rpg"
+- Create "python_rpg" database
+- Try run "uvicorn app.main:app --reload" the characters table will be created
+- in main.py file add "SessionLocal" to .database import 
+- add "Depends" to fastapi import
+- add "from .models import Characters"
+- add "from typing import Annotated"
+- add "from sqlalchemy.orm import Session" then add the following line
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+        #before this line execute before sending response
+    finally:
+        db.close()
+
+@app.get("/")
+async def read_all_character(db: Annotated[Session, Depends(get_db)]):
+    return db.query(Characters).all()
+
+- let's move dependency as function_variable
+
+db_dependency = Annotated[Session, Depends(get_db)]
+        
+@app.get("/")
+async def read_all_character(db: db_dependency):
+    return db.query(Characters).all()
+
+- Create "dependencies.py" and move all db_dependency code
+
+from typing import Annotated
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from .database import SessionLocal
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+        #before this line execute before sending response
+    finally:
+        db.close()
+        
+db_dependency = Annotated[Session, Depends(get_db)]
+
+- create "character_repository.py" under "repositories" folder
+
+from ..dependencies import db_dependency
+from ..models import Characters
+
+class CharacterRepository:
+    
+    def __init__(self, db: db_dependency):
+        self.db = db
+        
+    def read_all(self) -> list[Characters]:
+        return self.db.query(Characters).all()
+
+- update main.py route "/" to use repository instead
+@app.get("/")
+async def read_all_character(character_repo: Annotated[CharacterRepository, Depends(CharacterRepository)]):
+    return character_repo.read_all()
+
+- Create "app/services/CharacterService.py"
+from fastapi import Depends
+from ..models import Characters
+from ..repositories.character_repository import CharacterRepository
+from typing import Annotated
+
+class CharacterService:
+    def __init__(self, repo: Annotated[CharacterRepository, Depends(CharacterRepository)]):
+        self.repo = repo
+        
+    def read_all(self) -> list[Characters]:
+        return self.repo.read_all()
+
+- Update main.py to use service instead of repo
+
+- Add add function to character repo with db.commit()
+def add(self, new_character: Characters) -> Characters:
+        self.db.add(new_character)
+        self.db.commit()
+        return new_character
+
+- then we going to create function for character service but we need dtos first
+- Update "/dtos/character_dtos.py" add import and following code
+from pydantic import BaseModel, ConfigDict, Field
+
+class AddCharacterDto(BaseModel):
+    name: str = Field(min_length=3, max_length=50)
+    role: CharacterRoleEnum
+    hit_points: int = Field(gt=0, lt=101)
+    attack: int = Field(ge=5, le=20)
+    defence: int = Field(ge=5, le=20)
+    magic: int = Field(ge=5, le=20)
+
+
+class GetCharacterDto(AddCharacterDto):
+    model_config = ConfigDict(from_attributes=True)
+    id: int = Field(gt=0)
+
+- update "/services/CharacterService.py"
+from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto
+
+def add(self, new_character: AddCharacterDto) -> GetCharacterDto:
+        db_character = self.repo.add(new_character=Characters(**new_character.model_dump()))
+        character = GetCharacterDto.model_validate(db_character)
+        return character
+
+- update main.py for add_character function
+from .dtos.character_dtos import AddCharacterDto, GetCharacterDto
+
+@app.post("/")
+async def add_character(new_character: AddCharacterDto, character_service: Annotated[CharacterService, Depends(CharacterService)]) -> GetCharacterDto:
+    result = character_service.add(new_character=new_character)
+    return result
+
