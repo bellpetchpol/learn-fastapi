@@ -255,3 +255,109 @@ def read_all(self, page_dto: PageDto) -> list[GetCharacterDto]:
 async def read_all_character(page_dtos: page_dependency, character_service: Annotated[CharacterService, Depends(CharacterService)]) -> list[GetCharacterDto]:
     return character_service.read_all(page_dtos)
 
+- now we see that we can do this our self but actually in fastapi there is a library we can use call "fastapi-pagination" run "pip install fastapi-pagination"
+- we will start from repository add import
+from fastapi_pagination.ext.sqlalchemy import paginate
+from fastapi_pagination import Page
+from sqlalchemy import select
+- and then update read_all code
+def read_all(self) -> Page[Characters]:
+    return paginate(self.db, select(Characters).order_by(Characters.id))
+
+- next update service
+def read_all(self) -> Page[GetCharacterDto]:
+    return self.repo.read_all()
+- next main.py we no longer need pageDto so we will remove it and add following import instead
+from fastapi_pagination import Page, add_pagination
+
+- add following code after initiate fastapi
+add_pagination(app)
+
+- fix read_all code to return Page[T]
+@app.get("/")
+async def read_all_character(
+    character_service: Annotated[CharacterService, Depends(CharacterService)]
+) -> Page[GetCharacterDto]:
+    return character_service.read_all()
+
+- as you can see right now the page size is unlimit let's change this behavior add following code in main.py
+from fastapi_pagination import Page, add_pagination
+
+Page = Page.with_custom_options(
+    size=Query(default=25, ge=1, le=100),
+)
+
+- let's add update character next start from dto let's create UpdateCharacterDto
+class UpdateCharacterDto(AddCharacterDto):
+    name: Annotated[str | None, Field(min_length=3, max_length=50)]
+    role: CharacterRoleEnum | None
+    hit_points: Annotated[int | None, Field(gt=0, lt=101)]
+    attack: Annotated[int | None, Field(ge=5, le=20)]
+    defence: Annotated[int | None, Field(ge=5, le=20)]
+    magic: Annotated[int | None, Field(ge=5, le=20)]
+
+- add update character to repositories
+def update(self, character_id: int, update_character: UpdateCharacterDto) -> Characters:
+        db_character = self.db.query(Characters).filter(Characters.id == character_id).first()
+        if update_character.name is not None:
+            db_character.name = update_character.name
+            
+        if update_character.hit_points is not None:
+            db_character.hit_points = update_character.hit_points
+        
+        if update_character.role is not None:
+            db_character.role = update_character.role
+            
+        if update_character.attack is not None:
+            db_character.attack = update_character.attack
+        
+        if update_character.defence is not None:
+            db_character.defence = update_character.defence
+            
+        if update_character.magic is not None:
+            db_character.magic = update_character.magic
+            
+        self.db.add(db_character)
+        self.db.flush()
+        return db_character
+
+- add update_character to service
+def update(self, character_id: int, update_character: UpdateCharacterDto) -> GetCharacterDto:
+        db_character = self.repo.update(
+            character_id=character_id, update_character=update_character
+        )
+        result = GetCharacterDto.model_validate(db_character)
+        return result
+
+- add update_character to main
+@app.put("/{character_id}/update")
+async def update_character(
+    character_id: Annotated[int, Path(gt=0)],
+    update_character: UpdateCharacterDto,
+    character_service: Annotated[CharacterService, Depends(CharacterService)]
+) -> GetCharacterDto:
+    result = character_service.update(
+        character_id=character_id, update_character=update_character
+    )
+    return result
+
+- the last one for character is delete let's start from repositories
+def delete(self, db_character: Characters) -> None:
+        self.db.delete(db_character)
+        self.db.commit()
+
+- next service
+def delete(self, character_id: int) -> None:
+        db_character = self.repo.read_by_id(character_id=character_id)
+        if db_character is None:
+            raise HTTPException(
+                status_code=404, detail=f"Character id: {character_id} not found")
+        self.repo.delete(db_character=db_character)
+
+- next main.py
+@app.delete("/{character_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_character(
+    character_id: Annotated[int, Path(gt=0)],
+    character_service: Annotated[CharacterService, Depends(CharacterService)]
+) -> None:
+    character_service.delete(character_id=character_id)

@@ -36,3 +36,11 @@ class AddCharacterDto(BaseModel):
 class GetCharacterDto(AddCharacterDto):
     model_config = ConfigDict(from_attributes=True)
     id: Annotated[int, Field(gt=0)]
+    
+class UpdateCharacterDto(AddCharacterDto):
+    name: Annotated[str | None, Field(min_length=3, max_length=50)]
+    role: CharacterRoleEnum | None
+    hit_points: Annotated[int | None, Field(gt=0, lt=101)]
+    attack: Annotated[int | None, Field(ge=5, le=20)]
+    defence: Annotated[int | None, Field(ge=5, le=20)]
+    magic: Annotated[int | None, Field(ge=5, le=20)]
