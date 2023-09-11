@@ -16,7 +16,7 @@ class AddCharacterDto(BaseModel):
     attack: Annotated[int, Field(ge=5, le=20)]
     defence: Annotated[int, Field(ge=5, le=20)]
     magic: Annotated[int, Field(ge=5, le=20)]
-    
+
     model_config = {
         "json_schema_extra": {
             "examples": [
@@ -36,8 +36,9 @@ class AddCharacterDto(BaseModel):
 class GetCharacterDto(AddCharacterDto):
     model_config = ConfigDict(from_attributes=True)
     id: Annotated[int, Field(gt=0)]
-    
-class UpdateCharacterDto(AddCharacterDto):
+
+
+class UpdateCharacterDto(BaseModel):
     name: Annotated[str | None, Field(min_length=3, max_length=50)]
     role: CharacterRoleEnum | None
     hit_points: Annotated[int | None, Field(gt=0, lt=101)]

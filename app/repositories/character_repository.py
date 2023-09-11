@@ -1,4 +1,4 @@
-from ..dependencies import db_dependency
+from ..dependencies.dependencies import db_dependency
 from ..models import Characters
 from fastapi_pagination.ext.sqlalchemy import paginate
 from fastapi_pagination import Page
@@ -22,9 +22,7 @@ class CharacterRepository:
         self.db.commit()
         return new_character
 
-    def update(self, character_id: int, update_character: UpdateCharacterDto) -> Characters:
-        db_character = self.db.query(Characters).filter(
-            Characters.id == character_id).first()
+    def update(self, db_character: Characters, update_character: UpdateCharacterDto) -> Characters:
         if update_character.name is not None:
             db_character.name = update_character.name
 
@@ -44,7 +42,7 @@ class CharacterRepository:
             db_character.magic = update_character.magic
 
         self.db.add(db_character)
-        self.db.flush()
+        self.db.commit()
         return db_character
 
     def delete(self, db_character: Characters) -> None:

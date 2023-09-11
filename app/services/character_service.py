@@ -1,31 +1,27 @@
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from fastapi_pagination import Page
 
 from ..models import Characters
 from ..repositories.character_repository import CharacterRepository
-from typing import Annotated
 from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
-
+from ..dependencies.repository_dependencies import character_repository_dependency
 
 class CharacterService:
-    def __init__(self, repo: Annotated[CharacterRepository, Depends(CharacterRepository)]):
+    def __init__(self, repo: character_repository_dependency):
         self.repo = repo
 
     def read_all(self) -> Page[GetCharacterDto]:
-        # paginated_db_characters = self.repo.read_all()
-        # characters = list[GetCharacterDto]()
-        # for db_character in paginated_db_characters.items:
-        #     characters.append(GetCharacterDto.model_validate(db_character))
-
-        # paginated_characters = Page[GetCharacterDto](
-        #     page =
-        # )
-        # paginated_characters.page = paginated_db_characters.page
-        # paginated_characters.pages = paginated_db_characters.pages
-        # paginated_characters.size = paginated_db_characters.size
-        # paginated_characters.total = paginated_db_characters.total
-        # paginated_db_characters.items = characters
-        return self.repo.read_all()
+        paginated_db_character = self.repo.read_all()
+        characters = [GetCharacterDto.model_validate(
+            db_character) for db_character in paginated_db_character.items]
+        paginated_characters = Page[GetCharacterDto](
+            items=characters,
+            page=paginated_db_character.page,
+            pages=paginated_db_character.pages,
+            total=paginated_db_character.total,
+            size= paginated_db_character.size
+        )
+        return paginated_characters
 
     def read_by_id(self, character_id: int) -> GetCharacterDto:
         db_character = self.repo.read_by_id(character_id=character_id)
@@ -41,16 +37,19 @@ class CharacterService:
         return character
 
     def update(self, character_id: int, update_character: UpdateCharacterDto) -> GetCharacterDto:
-        db_character = self.repo.update(
-            character_id=character_id, update_character=update_character
+        db_character = self.repo.read_by_id(character_id=character_id)
+        if db_character is None:
+            raise HTTPException(
+                status_code=404, detail=f"Character id: {character_id} not found")
+        updated_db_character = self.repo.update(
+            db_character=db_character, update_character=update_character
         )
-        result = GetCharacterDto.model_validate(db_character)
+        result = GetCharacterDto.model_validate(updated_db_character)
         return result
-    
+
     def delete(self, character_id: int) -> None:
         db_character = self.repo.read_by_id(character_id=character_id)
         if db_character is None:
             raise HTTPException(
                 status_code=404, detail=f"Character id: {character_id} not found")
         self.repo.delete(db_character=db_character)
-        

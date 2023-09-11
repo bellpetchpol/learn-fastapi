@@ -1,8 +1,7 @@
 from typing import Annotated
 from sqlalchemy.orm import Session
 from fastapi import Depends
-from .database import SessionLocal
-from .dtos.request_dtos import PageDto
+from ..database import SessionLocal
 
 
 def get_db():
@@ -15,9 +14,3 @@ def get_db():
 
 
 db_dependency = Annotated[Session, Depends(get_db)]
-
-
-async def page_parameters(skip: int = 0, limit: int = 25) -> PageDto:
-    return PageDto(**{"skip": skip, "limit": limit})
-
-page_dependency = Annotated[PageDto, Depends(page_parameters)]

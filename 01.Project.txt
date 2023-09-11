@@ -135,6 +135,42 @@ class CharacterService:
 
 - Update main.py to use service instead of repo
 
+- new version of python and sqlalchemy we need to change something for models
+class Characters(Base):
+    __tablename__ = "characters"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(30), nullable=True)
+    role: Mapped[CharacterRoleEnum] = mapped_column(
+        Enum(CharacterRoleEnum, name="character_role"))
+    hit_points: Mapped[int]
+    attack: Mapped[int]
+    defence: Mapped[int]
+    magic: Mapped[int]
+    
+    def __repr__(self) -> str:
+        return f"Character(id={self.id}!r, name={self.name}!r, role={self.role.value}!r, hit_points={self.hit_points}!r, attack={self.attack}!r, defence={self.defence}!r, magic={self.magic}!r)"
+
+- Move service and repo dependencies to dependencies folder
+- Create "dependencies/repository_dependencies.py"
+from typing import Annotated
+from fastapi import Depends
+from ..repositories.character_repository import CharacterRepository
+
+character_repository_dependency = Annotated[CharacterRepository, Depends(
+    CharacterRepository)]
+
+- Create "dependencies/service_dependencies.py"
+from typing import Annotated
+from fastapi import Depends
+from ..services.character_service import CharacterService
+
+character_service_dependency = Annotated[CharacterService, Depends(
+    CharacterService)]
+
+
+
+
 - Add add function to character repo with db.commit()
 def add(self, new_character: Characters) -> Characters:
         self.db.add(new_character)
@@ -297,36 +333,39 @@ class UpdateCharacterDto(AddCharacterDto):
     magic: Annotated[int | None, Field(ge=5, le=20)]
 
 - add update character to repositories
-def update(self, character_id: int, update_character: UpdateCharacterDto) -> Characters:
-        db_character = self.db.query(Characters).filter(Characters.id == character_id).first()
+def update(self, db_character: Characters, update_character: UpdateCharacterDto) -> Characters:
         if update_character.name is not None:
             db_character.name = update_character.name
-            
+
         if update_character.hit_points is not None:
             db_character.hit_points = update_character.hit_points
-        
+
         if update_character.role is not None:
             db_character.role = update_character.role
-            
+
         if update_character.attack is not None:
             db_character.attack = update_character.attack
-        
+
         if update_character.defence is not None:
             db_character.defence = update_character.defence
-            
+
         if update_character.magic is not None:
             db_character.magic = update_character.magic
-            
+
         self.db.add(db_character)
-        self.db.flush()
+        self.db.commit()
         return db_character
 
 - add update_character to service
 def update(self, character_id: int, update_character: UpdateCharacterDto) -> GetCharacterDto:
-        db_character = self.repo.update(
-            character_id=character_id, update_character=update_character
+        db_character = self.repo.read_by_id(character_id=character_id)
+        if db_character is None:
+            raise HTTPException(
+                status_code=404, detail=f"Character id: {character_id} not found")
+        updated_db_character = self.repo.update(
+            db_character=db_character, update_character=update_character
         )
-        result = GetCharacterDto.model_validate(db_character)
+        result = GetCharacterDto.model_validate(updated_db_character)
         return result
 
 - add update_character to main
@@ -334,7 +373,7 @@ def update(self, character_id: int, update_character: UpdateCharacterDto) -> Get
 async def update_character(
     character_id: Annotated[int, Path(gt=0)],
     update_character: UpdateCharacterDto,
-    character_service: Annotated[CharacterService, Depends(CharacterService)]
+    character_service: character_service_dependency
 ) -> GetCharacterDto:
     result = character_service.update(
         character_id=character_id, update_character=update_character
