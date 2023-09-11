@@ -268,8 +268,11 @@ class PageDto(BaseModel):
     limit: int = 25
 
 - update page_parameters in dependencies.py
-async def page_parameters(skip: int = 0, limit: int = 25) -> PageDto:
-    return PageDto(**{"skip": skip, "limit": limit})
+async def page_parameters(
+    page: Annotated[int, Path(ge=1)] = 1,
+    size: Annotated[int, Path(le=100)] = 25
+) -> PageDto:
+    return PageDto(**{"page": page, "size": size})
 
 - and make it as dependency
 page_dependency = Annotated[PageDto, Depends(page_parameters)]
@@ -302,7 +305,17 @@ def read_all(self) -> Page[Characters]:
 
 - next update service
 def read_all(self) -> Page[GetCharacterDto]:
-    return self.repo.read_all()
+        paginated_db_character = self.repo.read_all()
+        characters = [GetCharacterDto.model_validate(
+            db_character) for db_character in paginated_db_character.items]
+        paginated_characters = Page[GetCharacterDto](
+            items=characters,
+            page=paginated_db_character.page,
+            pages=paginated_db_character.pages,
+            total=paginated_db_character.total,
+            size= paginated_db_character.size
+        )
+        return paginated_characters
 - next main.py we no longer need pageDto so we will remove it and add following import instead
 from fastapi_pagination import Page, add_pagination
 
@@ -312,14 +325,14 @@ add_pagination(app)
 - fix read_all code to return Page[T]
 @app.get("/")
 async def read_all_character(
-    character_service: Annotated[CharacterService, Depends(CharacterService)]
+    character_service: character_service_dependency
 ) -> Page[GetCharacterDto]:
     return character_service.read_all()
 
-- as you can see right now the page size is unlimit let's change this behavior add following code in main.py
+- as you can see right now the page size(limit) is 50 let's change this behavior add following code in main.py
 from fastapi_pagination import Page, add_pagination
 
-Page = Page.with_custom_options(
+Page = Page.with_custom_options(# type: ignore[misc]
     size=Query(default=25, ge=1, le=100),
 )
 

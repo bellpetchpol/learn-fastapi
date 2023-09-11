@@ -7,9 +7,10 @@ from .database import engine
 from .dependencies.service_dependencies import character_service_dependency
 from .dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
 
-# Page = Page.with_custom_options(
-#     size=Query(default=25, ge=1, le=100),
-# )
+
+Page = Page.with_custom_options(# type: ignore[misc]
+    size=Query(default=25, ge=1, le=100),
+)
 
 app = FastAPI()
 
