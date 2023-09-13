@@ -336,6 +336,12 @@ Page = Page.with_custom_options(# type: ignore[misc]
     size=Query(default=25, ge=1, le=100),
 )
 
+- จากปัญหาเรื่อง dynamic type เกิดจาก arbitrary_types
+model_config = ConfigDict(arbitrary_types_allowed=True)
+
+- ปรับปรุง code ใน service ให้เหลือ บรรทัดน้อยลง
+page_response = PageResponseDto[GetCharacterDto](**db_page_response.model_dump())
+
 - let's add update character next start from dto let's create UpdateCharacterDto
 class UpdateCharacterDto(AddCharacterDto):
     name: Annotated[str | None, Field(min_length=3, max_length=50)]

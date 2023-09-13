@@ -1,8 +1,8 @@
-from typing import Annotated
+from typing import Annotated, Generic, TypeVar
 from sqlalchemy.orm import Session
-from fastapi import Depends, Path
+from fastapi import Depends, Query
 from ..database import SessionLocal
-from ..dtos.request_dtos import PageDto
+from ..dtos.request_dtos import PageRequestDto, PageResponseDto
 
 
 def get_db():
@@ -17,11 +17,15 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 
 
-async def page_parameters(
-    page: Annotated[int, Path(ge=1)] = 1,
-    size: Annotated[int, Path(le=100)] = 25
-) -> PageDto:
-    return PageDto(**{"page": page, "size": size})
+def page_parameter(
+    page: Annotated[int, Query(gt=0)] = 1,
+    size: Annotated[int, Query(le=100)] = 25
+) -> PageRequestDto:
+    return PageRequestDto(
+        page=page,
+        size=size
+    )
 
 
-page_dependency = Annotated[PageDto, Depends(page_parameters)]
+page_dependency = Annotated[PageRequestDto, Depends(page_parameter)]
+

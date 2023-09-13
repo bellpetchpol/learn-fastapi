@@ -1,9 +1,8 @@
+from math import ceil
 from ..dependencies.dependencies import db_dependency
 from ..models import Characters
-from fastapi_pagination.ext.sqlalchemy import paginate
-from fastapi_pagination import Page
-from sqlalchemy import select
 from ..dtos.character_dtos import UpdateCharacterDto
+from ..dtos.request_dtos import PageResponseDto
 
 
 class CharacterRepository:
@@ -11,8 +10,21 @@ class CharacterRepository:
     def __init__(self, db: db_dependency):
         self.db = db
 
-    def read_all(self) -> Page[Characters]:
-        return paginate(self.db, select(Characters).order_by(Characters.id))
+    def read_all(self, page: int, size: int) -> PageResponseDto[Characters]:
+        offset = size * (page - 1)
+        query = self.db.query(Characters).order_by(Characters.id)
+        total = query.count()
+        pages = ceil(total / size)
+        
+        result = PageResponseDto[Characters](
+            items=query.offset(offset).limit(size).all(),
+            page=page,
+            pages=pages,
+            size=size,
+            total=total
+        )
+        
+        return result
 
     def read_by_id(self, character_id: int) -> Characters | None:
         return self.db.query(Characters).filter(Characters.id == character_id).first()

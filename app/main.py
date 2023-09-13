@@ -6,6 +6,8 @@ from .database import engine
 
 from .dependencies.service_dependencies import character_service_dependency
 from .dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
+from .dependencies.dependencies import page_dependency
+from .dtos.request_dtos import PageResponseDto
 
 
 Page = Page.with_custom_options(# type: ignore[misc]
@@ -19,11 +21,12 @@ add_pagination(app)
 models.Base.metadata.create_all(bind=engine)
 
 
-@app.get("/")
+@app.get("/characters/")
 async def read_all_character(
-    character_service: character_service_dependency
-) -> Page[GetCharacterDto]:
-    return character_service.read_all()
+    character_service: character_service_dependency,
+    page: page_dependency
+) -> PageResponseDto[GetCharacterDto]:
+    return character_service.read_all(page=page.page, size=page.size)
 
 
 @app.get("/{character_id}", status_code=200)

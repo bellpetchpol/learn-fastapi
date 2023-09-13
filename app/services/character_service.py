@@ -1,27 +1,28 @@
 from fastapi import HTTPException
-from fastapi_pagination import Page
 
 from ..models import Characters
 from ..repositories.character_repository import CharacterRepository
 from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
 from ..dependencies.repository_dependencies import character_repository_dependency
+from ..dtos.request_dtos import PageResponseDto
 
 class CharacterService:
     def __init__(self, repo: character_repository_dependency):
         self.repo = repo
 
-    def read_all(self) -> Page[GetCharacterDto]:
-        paginated_db_character = self.repo.read_all()
-        characters = [GetCharacterDto.model_validate(
-            db_character) for db_character in paginated_db_character.items]
-        paginated_characters = Page[GetCharacterDto](
-            items=characters,
-            page=paginated_db_character.page,
-            pages=paginated_db_character.pages,
-            total=paginated_db_character.total,
-            size= paginated_db_character.size
-        )
-        return paginated_characters
+    def read_all(self, page: int, size: int) -> PageResponseDto[GetCharacterDto]:
+        db_page_response = self.repo.read_all(page=page, size=size)
+        # characters = [GetCharacterDto.model_validate(
+        #     db_character) for db_character in db_page_response.items]
+        # page_response = PageResponseDto[GetCharacterDto](
+        #     items=characters,
+        #     page=db_page_response.page,
+        #     size=db_page_response.size,
+        #     pages=db_page_response.pages,
+        #     total=db_page_response.total
+        # )
+        page_response = PageResponseDto[GetCharacterDto](**db_page_response.model_dump())
+        return page_response
 
     def read_by_id(self, character_id: int) -> GetCharacterDto:
         db_character = self.repo.read_by_id(character_id=character_id)
