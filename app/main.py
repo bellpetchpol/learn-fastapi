@@ -8,17 +8,24 @@ from .dependencies.service_dependencies import character_service_dependency
 from .dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
 from .dependencies.dependencies import page_dependency
 from .dtos.request_dtos import PageResponseDto
+from fastapi.security import OAuth2PasswordBearer
 
 
 Page = Page.with_custom_options(# type: ignore[misc]
     size=Query(default=25, ge=1, le=100),
 )
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 app = FastAPI()
 
 add_pagination(app)
 
 models.Base.metadata.create_all(bind=engine)
+
+@app.get("/token/")
+async def read_token(token: Annotated[str, Depends(oauth2_scheme)]):
+    return {"token": token}
 
 
 @app.get("/characters/")

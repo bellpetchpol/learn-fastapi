@@ -1,0 +1,161 @@
+1. อธิบาย security There are many ways to handle security, authentication and authorization.
+
+And it normally is a complex and "difficult" topic.
+
+In many frameworks and systems just handling security and authentication takes a big amount of effort and code (in many cases it can be 50% or more of all the code written).
+
+FastAPI provides several tools to help you deal with Security easily, rapidly, in a standard way, without having to study and learn all the security specifications.
+
+เช่น
+Oauth2 เป็น spec ในการทำ authentication ที่สามารถ authorization ได้หลากหลายรูปแบบวิธีเช่น
+1. username & password - Web,Mobile
+2. client_id & client_secret - Api
+ซึ่ง google/facebook/ twitter ก็ใช้วิธีนี้
+Oauth1 ชื่อเหมือน Oauth2 แต่ซับซ้อนกว่า ทุกวันนี้ไม่เป็นที่นิยมแล้ว
+
+2.เราต้องลง lib เพิ่มเพราะ oauth2 เวลาที่ login ด้วย user/password จะต้องส่งข้อมูลผ่าน "form data" 
+pip install python-multipart
+
+3.มาดูตัวอย่างคร่าวๆก่อนว่าหน้าตาของ oauth2 ทำ authentication ยังไง เพิ่ม code นี้ไปที่ main.py
+from fastapi.security import OAuth2PasswordBearer
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+@app.get("/token/")
+async def read_token(token: Annotated[str, Depends(oauth2_scheme)]):
+    return {"token": token}
+
+4.จะเห็นว่าเรามีปุ่ม Authorize โพล่มาใน swagger ซึ่งจะยังใช้ไม่ได้จริงแต่ไม่ต้องเป็นห่วงเดี๋ยวเราจะค่อยๆทำให้มันใช้ได้
+
+5. เรามาพูดถึงก่อน auth ด้วย username / password ก่อน
+
+The password "flow" is one of the ways ("flows") defined in OAuth2, to handle security and authentication.
+
+OAuth2 was designed so that the backend or API could be ***independent of the server that authenticates the user.
+
+But in this case, the same FastAPI application will handle the API and the authentication.
+
+So, let's review it from that simplified point of view:
+
+5.1 The user types the username and password in the frontend, and hits Enter.
+5.2 The frontend (running in the user's browser) sends that username and password to a specific URL in our API (declared with tokenUrl="token").
+5.3 The API checks that username and password, and responds with a "token" (we haven't implemented any of this yet).
+5.4 A "token" is just a string with some content that we can use later to verify this user.
+5.5 Normally, a token is set to expire after some time.
+5.6 So, the user will have to log in again at some point later.
+5.7 And if the token is stolen, the risk is less. It is not like a permanent key that will work forever (in most of the cases).
+5.8 The frontend stores that token temporarily somewhere.
+5.9 The user clicks in the frontend to go to another section of the frontend web app.
+5.10 The frontend needs to fetch some more data from the API.
+5.11 But it needs authentication for that specific endpoint.
+5.12 So, to authenticate with our API, it sends a header Authorization with a value of Bearer plus the token.
+5.13 If the token contains foobar, the content of the Authorization header would be: Bearer foobar.
+
+6. เราจะมาสร้าง user model ก่อน add following code to models.py
+class Users(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(25))
+    full_name: Mapped[str | None]
+    hashed_password: Mapped[str]
+    disabled: Mapped[bool] = mapped_column(default=False)
+    create_by: Mapped[str] = mapped_column(String(25))
+    create_date: Mapped[datetime] = mapped_column(
+        default=datetime.now())
+    update_by: Mapped[str | None] = mapped_column(String(25))
+    update_date: Mapped[datetime] = mapped_column(
+        default=datetime.now())
+
+    def __repr__(self) -> str:
+        return f"Users(id={self.id}!r, username={self.username}!r, full_name={self.full_name}!r, hashed_password={self.hashed_password}!r, disabled={self.disabled}!r, create_by={self.create_by}!r, create_date={self.create_date}!r, update_by={self.update_by}!r, update_date={self.update_date}!r)"
+
+7. then try to run code the user table will be create on db
+8. Next we will create user repository
+from ..dependencies.dependencies import db_dependency
+from ..models import Users
+class UserRepository:
+    
+    def __init__(self, db: db_dependency):
+        self.db = db
+        
+    def add(self, new_user: Users) -> Users:
+        self.db.add(new_user)
+        self.db.commit()
+        return new_user
+
+9. Add following code to repository_dependencies.py
+from ..repositories.user_repository import UserRepository
+user_repository = Annotated[UserRepository, Depends(UserRepository)]
+
+10. create user_service.py
+from ..dependencies.repository_dependencies import user_repository
+
+class UserService:
+    def __init__(self, repo: user_repository):
+        self.repo = repo
+        
+    def register(self, new_user: RegisterUserDto) -> GetUserDto:
+        pass
+
+11. Now we know that we need to create RegisterUserDto and GetUserDto so let's create user_dtos.py
+from datetime import datetime
+from pydantic import BaseModel, Field
+from typing import Annotated
+
+
+class AddUserDto(BaseModel):
+    username: Annotated[str, Field(max_length=25)]
+    full_name: str | None
+
+
+class RegisterUserDto(AddUserDto):
+    password: str
+
+
+class GetUserDto(AddUserDto):
+    disabled: bool
+    create_by: str
+    create_date: datetime
+    update_by: str
+    update_date: datetime
+
+
+12. then we use those dto in service
+from ..dtos.user_dtos import RegisterUserDto, GetUserDto
+from ..models import Users
+        
+    def register(self, new_user: RegisterUserDto) -> GetUserDto:
+        db_user = self.repo.add(new_user=Users(**new_user.model_dump()))
+        user = GetUserDto.model_validate(db_user)
+        return user
+
+13. now we need to add create_hashed_password function but i think we should create it as dependencies let's create auth_service.py
+14. and we need to install passlib library
+pip install "passlib[bcrypt]"
+15. จากนั้น import library
+from passlib.context import CryptContext
+15. จะเห็นว่ายังมี error บางอย่าง mypy ฟ้องให้เราลงอะไรบางอย่างเพิ่ม
+pip install types-passlib
+16. เพิ่ม function ในการ สร้าง hash และ validation
+class AuthService:
+    def __init__(self):
+        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    def verify_password(self, plain_password, hashed_password):
+        return self.pwd_context.verify(plain_password, hashed_password)
+
+    def create_password_hash(self, password):
+        return self.pwd_context.hash(password)
+
+17. ไปที่ service_dependencies.py แล้วทำให้ auth_service สามารถ inject ได้
+from ..services.auth_service import AuthService
+auth_service_dependency = Annotated[AuthService, Depends(AuthService)]
+
+18. ไปที่ user_service แล้ว inject auth_service
+from ..dependencies.service_dependencies import AuthService
+def __init__(self, repo: user_repository, auth: AuthService):
+        self.repo = repo
+        self.auth = auth
+
+19. ปรับปรุง function add ให้สร้าง hashed_password ก่อน save
+db_user.hashed_password = self.auth.create_password_hash(new_user.password)
+    

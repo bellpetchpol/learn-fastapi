@@ -1,7 +1,6 @@
 from fastapi import HTTPException
 
 from ..models import Characters
-from ..repositories.character_repository import CharacterRepository
 from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
 from ..dependencies.repository_dependencies import character_repository_dependency
 from ..dtos.request_dtos import PageResponseDto
