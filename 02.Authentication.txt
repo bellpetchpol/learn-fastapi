@@ -158,4 +158,19 @@ def __init__(self, repo: user_repository, auth: AuthService):
 
 19. ปรับปรุง function add ให้สร้าง hashed_password ก่อน save
 db_user.hashed_password = self.auth.create_password_hash(new_user.password)
+
+20. นำ user serivce ไปใส่ใน service_dependencies.py
+from ..services.user_service import UserService
+user_service_dependency = Annotated[UserService, Depends(UserService)]
+
+21. add following code to main.py
+@app.post("/users/register", status_code=201)
+async def register_user(
+    new_user: RegisterUserDto,
+    user_service: user_service_dependency
+) -> GetUserDto:
+    user_service.register(new_user=new_user)
+
+
+https://fastapi.tiangolo.com/async/#in-a-hurry
     

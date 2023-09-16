@@ -1,12 +1,12 @@
 from ..dependencies.repository_dependencies import user_repository
 from ..dtos.user_dtos import RegisterUserDto, GetUserDto
 from ..models import Users
-from ..dependencies.service_dependencies import AuthService
+from ..dependencies.service_dependencies import auth_service_dependency
 
 
 class UserService:
 
-    def __init__(self, repo: user_repository, auth: AuthService):
+    def __init__(self, repo: user_repository, auth: auth_service_dependency):
         self.repo = repo
         self.auth = auth
 

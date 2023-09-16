@@ -4,11 +4,12 @@ from fastapi_pagination import Page, add_pagination
 from . import models
 from .database import engine
 
-from .dependencies.service_dependencies import character_service_dependency
+from .dependencies.service_dependencies import character_service_dependency, user_service_dependency
 from .dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
 from .dependencies.dependencies import page_dependency
 from .dtos.request_dtos import PageResponseDto
 from fastapi.security import OAuth2PasswordBearer
+from .dtos.user_dtos import RegisterUserDto, GetUserDto
 
 
 Page = Page.with_custom_options(# type: ignore[misc]
@@ -70,3 +71,11 @@ async def delete_character(
     character_service: character_service_dependency
 ) -> None:
     character_service.delete(character_id=character_id)
+    
+@app.post("/users/register", status_code=201)
+async def register_user(
+    new_user: RegisterUserDto,
+    user_service: user_service_dependency
+) -> GetUserDto:
+    user = user_service.register(new_user=new_user)
+    return user
