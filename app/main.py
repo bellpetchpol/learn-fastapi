@@ -1,5 +1,5 @@
 from typing import Annotated
-from fastapi import Depends, FastAPI, Path, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, status
 from fastapi_pagination import Page, add_pagination
 from . import models
 from .database import engine
@@ -10,6 +10,17 @@ from .dependencies.dependencies import page_dependency
 from .dtos.request_dtos import PageResponseDto
 from fastapi.security import OAuth2PasswordBearer
 from .dtos.user_dtos import RegisterUserDto, GetUserDto
+
+import logging
+from os import path
+log_file_path = path.join(path.dirname(path.abspath(__file__)), 'logging.conf')
+# setup loggers
+logging.config.fileConfig(log_file_path, disable_existing_loggers=False)# type: ignore[attr-defined]
+
+# get root logger
+logger = logging.getLogger(__name__)  # the __name__ resolve to "main" since we are at the root of the project. 
+                                      # This will get the root logger since no logger in the configuration has this name.
+
 
 
 Page = Page.with_custom_options(# type: ignore[misc]
@@ -77,5 +88,9 @@ async def register_user(
     new_user: RegisterUserDto,
     user_service: user_service_dependency
 ) -> GetUserDto:
-    user = user_service.register(new_user=new_user)
-    return user
+    try:
+        user = user_service.register(new_user=new_user)
+        return user
+    except Exception as e:
+        logger.error(e)
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -1,6 +1,6 @@
 from passlib.context import CryptContext
 
-class AuthService:
+class AuthRepository:
     def __init__(self):
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

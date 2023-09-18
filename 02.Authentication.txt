@@ -59,11 +59,11 @@ class Users(Base):
     hashed_password: Mapped[str]
     disabled: Mapped[bool] = mapped_column(default=False)
     create_by: Mapped[str] = mapped_column(String(25))
-    create_date: Mapped[datetime] = mapped_column(
-        default=datetime.now())
+    create_date: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+        default=datetime.utcnow())
     update_by: Mapped[str | None] = mapped_column(String(25))
-    update_date: Mapped[datetime] = mapped_column(
-        default=datetime.now())
+    update_date: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+        default=datetime.utcnow())
 
     def __repr__(self) -> str:
         return f"Users(id={self.id}!r, username={self.username}!r, full_name={self.full_name}!r, hashed_password={self.hashed_password}!r, disabled={self.disabled}!r, create_by={self.create_by}!r, create_date={self.create_date}!r, update_by={self.update_by}!r, update_date={self.update_date}!r)"
@@ -104,7 +104,7 @@ from typing import Annotated
 
 class AddUserDto(BaseModel):
     username: Annotated[str, Field(max_length=25)]
-    full_name: str | None
+    full_name: str | None = None
 
 
 class RegisterUserDto(AddUserDto):
@@ -128,7 +128,7 @@ from ..models import Users
         user = GetUserDto.model_validate(db_user)
         return user
 
-13. now we need to add create_hashed_password function but i think we should create it as dependencies let's create auth_service.py
+13. now we need to add create_hashed_password function but i think we should create it as dependencies let's create auth_repository.py
 14. and we need to install passlib library
 pip install "passlib[bcrypt]"
 15. จากนั้น import library
@@ -136,7 +136,7 @@ from passlib.context import CryptContext
 15. จะเห็นว่ายังมี error บางอย่าง mypy ฟ้องให้เราลงอะไรบางอย่างเพิ่ม
 pip install types-passlib
 16. เพิ่ม function ในการ สร้าง hash และ validation
-class AuthService:
+class AuthRepository:
     def __init__(self):
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -146,13 +146,13 @@ class AuthService:
     def create_password_hash(self, password):
         return self.pwd_context.hash(password)
 
-17. ไปที่ service_dependencies.py แล้วทำให้ auth_service สามารถ inject ได้
-from ..services.auth_service import AuthService
-auth_service_dependency = Annotated[AuthService, Depends(AuthService)]
+17. ไปที่ repository_dependencies.py แล้วทำให้ auth_repository สามารถ inject ได้
+from ..repositories.auth_repository import AuthRepository
+auth_repository = Annotated[AuthRepository, Depends(AuthRepository)]
 
-18. ไปที่ user_service แล้ว inject auth_service
-from ..dependencies.service_dependencies import AuthService
-def __init__(self, repo: user_repository, auth: AuthService):
+18. ไปที่ user_service แล้ว inject auth_repository
+from ..dependencies.repository_dependencies import user_repository, auth_repository
+def __init__(self, repo: user_repository, auth: auth_repository):
         self.repo = repo
         self.auth = auth
 
@@ -170,6 +170,118 @@ async def register_user(
     user_service: user_service_dependency
 ) -> GetUserDto:
     user_service.register(new_user=new_user)
+
+22. let's try create user we will get error that we should pass password as parameter to create Users let's update register function
+def register(self, new_user: RegisterUserDto) -> GetUserDto:
+        user_dict = new_user.model_dump()
+        user_dict.pop("password")
+        db_user = self.repo.add(new_user=Users(**user_dict))
+        db_user.hashed_password = self.auth.create_password_hash(new_user.password)
+        user = GetUserDto.model_validate(db_user)
+        return user
+
+23. we will still get error that hashed_password is null
+24. we will try to print hashed_password 
+hashed_password = self.auth.create_password_hash(new_user.password)
+        print(hashed_password)
+
+25. but it won't work we going to need logging let's create logging.conf along side main.py and pu following code
+[loggers]
+keys=root,app
+
+[handlers]
+keys=consoleHandler,detailedConsoleHandler
+
+[formatters]
+keys=normalFormatter,detailedFormatter
+
+[logger_root]
+level=INFO
+handlers=consoleHandler
+
+[logger_app]
+level=DEBUG
+handlers=detailedConsoleHandler
+qualname=app
+propagate=0
+
+[handler_consoleHandler]
+class=StreamHandler
+level=DEBUG
+formatter=normalFormatter
+args=(sys.stdout,)
+
+[handler_detailedConsoleHandler]
+class=StreamHandler
+level=DEBUG
+formatter=detailedFormatter
+args=(sys.stdout,)
+
+[formatter_normalFormatter]
+format=%(asctime)s loglevel=%(levelname)-6s logger=%(name)s %(funcName)s() L%(lineno)-4d %(message)s
+
+[formatter_detailedFormatter]
+format=%(asctime)s loglevel=%(levelname)-6s logger=%(name)s %(funcName)s() L%(lineno)-4d %(message)s   call_trace=%(pathname)s L%(lineno)-4d
+
+26.This file configures the loggers. I created the root and uicheckapp loggers. The root logger is a special logger. It is the logger that will be used if no other is found.
+
+The uicheckapp logger has the same name as the package in which I have all my code I want to log from. This is very important, because a logger is selected by module name.
+
+27. put following code to main.py
+import logging
+from os import path
+log_file_path = path.join(path.dirname(path.abspath(__file__)), 'logging.conf')
+# setup loggers
+logging.config.fileConfig(log_file_path, disable_existing_loggers=False)# type: ignore[attr-defined]
+
+# get root logger
+logger = logging.getLogger(__name__)  # the __name__ resolve to "main" since we are at the root of the project. 
+                                      # This will get the root logger since no logger in the configuration has this name.
+
+28. and following code to user_service.py
+import logging
+
+logger = logging.getLogger(__name__)  # the __name__ resolve to "app.services"
+                                      # This will load the app logger
+
+29. try to use the log in register function
+logger.info(hashed_password)
+
+30. still couldn't find log error when we really pay attention to the code we will see that the reason is we never reach the logger it's alraedy error when we call repo.add so let's move something 
+def register(self, new_user: RegisterUserDto) -> GetUserDto:
+        user_dict = new_user.model_dump()
+        user_dict.pop("password")
+        logger.info("log here")
+        db_user = self.repo.add(new_user=Users(**user_dict))
+        hashed_password = self.auth.create_password_hash(new_user.password)
+        db_user.hashed_password = self.auth.create_password_hash(new_user.password)
+        user = GetUserDto.model_validate(db_user)
+        return user
+
+31. now we saw the logger let's try fix the code
+ user_dict = new_user.model_dump()
+        user_dict.pop("password")
+        db_user = Users(**user_dict)
+        db_user.hashed_password = self.auth.create_password_hash(new_user.password)
+        db_user = self.repo.add(new_user=db_user)
+        user = GetUserDto.model_validate(db_user)
+        return user
+
+32. still got error that create_by can't be null let's add followging code before insert
+db_user.create_by = "register"
+33. we still get error and right now everyone should see that the error was too long let's use try catch and logging to minimize it update following code in main.py register function
+try:
+        user = user_service.register(new_user=new_user)
+        return user
+    except Exception as e:
+        logger.error(e)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+34. the error will tell that we can't validation error for GetUserDto Input should be a valid dictionary or instance of GetUserDto it's because we need model config for user_dtos let's add it it GetUserDto
+model_config = ConfigDict(from_attributes=True)
+
+35. we make update_by in model as optional but not in pydantic let's fix it
+update_by: str | None = None
 
 
 https://fastapi.tiangolo.com/async/#in-a-hurry
