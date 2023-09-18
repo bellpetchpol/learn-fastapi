@@ -1,10 +1,10 @@
 from typing import Annotated
 from fastapi import Depends
 from ..services.character_service import CharacterService
-from ..services.user_service import UserService
+from ..services.auth_service import AuthService
 
 character_service_dependency = Annotated[CharacterService, Depends(
     CharacterService)]
 
 
-user_service_dependency = Annotated[UserService, Depends(UserService)]
+auth_service_dependency = Annotated[AuthService, Depends(AuthService)]

@@ -25,7 +25,7 @@ class Users(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    username: Mapped[str] = mapped_column(String(25))
+    username: Mapped[str] = mapped_column(String(25), unique=True, index=True)
     full_name: Mapped[str | None]
     hashed_password: Mapped[str]
     disabled: Mapped[bool] = mapped_column(default=False)

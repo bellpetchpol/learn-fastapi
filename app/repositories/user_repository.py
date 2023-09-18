@@ -9,3 +9,7 @@ class UserRepository:
         self.db.add(new_user)
         self.db.commit()
         return new_user
+    
+    def read_by_username(self, username: str) -> Users | None:
+        return self.db.query(Users).filter(Users.username == username).first()
+         

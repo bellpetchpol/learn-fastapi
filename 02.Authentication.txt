@@ -86,10 +86,10 @@ class UserRepository:
 from ..repositories.user_repository import UserRepository
 user_repository = Annotated[UserRepository, Depends(UserRepository)]
 
-10. create user_service.py
+10. create auth_service.py
 from ..dependencies.repository_dependencies import user_repository
 
-class UserService:
+class AuthService:
     def __init__(self, repo: user_repository):
         self.repo = repo
         
@@ -150,7 +150,7 @@ class AuthRepository:
 from ..repositories.auth_repository import AuthRepository
 auth_repository = Annotated[AuthRepository, Depends(AuthRepository)]
 
-18. ไปที่ user_service แล้ว inject auth_repository
+18. ไปที่ auth_service แล้ว inject auth_repository
 from ..dependencies.repository_dependencies import user_repository, auth_repository
 def __init__(self, repo: user_repository, auth: auth_repository):
         self.repo = repo
@@ -160,16 +160,16 @@ def __init__(self, repo: user_repository, auth: auth_repository):
 db_user.hashed_password = self.auth.create_password_hash(new_user.password)
 
 20. นำ user serivce ไปใส่ใน service_dependencies.py
-from ..services.user_service import UserService
-user_service_dependency = Annotated[UserService, Depends(UserService)]
+from ..services.auth_service import AuthService
+auth_service_dependency = Annotated[AuthService, Depends(AuthService)]
 
 21. add following code to main.py
-@app.post("/users/register", status_code=201)
+@app.post("/auth/register", status_code=201)
 async def register_user(
     new_user: RegisterUserDto,
-    user_service: user_service_dependency
+    auth_service: auth_service_dependency
 ) -> GetUserDto:
-    user_service.register(new_user=new_user)
+    auth_service.register(new_user=new_user)
 
 22. let's try create user we will get error that we should pass password as parameter to create Users let's update register function
 def register(self, new_user: RegisterUserDto) -> GetUserDto:
@@ -238,7 +238,7 @@ logging.config.fileConfig(log_file_path, disable_existing_loggers=False)# type: 
 logger = logging.getLogger(__name__)  # the __name__ resolve to "main" since we are at the root of the project. 
                                       # This will get the root logger since no logger in the configuration has this name.
 
-28. and following code to user_service.py
+28. and following code to auth_service.py
 import logging
 
 logger = logging.getLogger(__name__)  # the __name__ resolve to "app.services"
@@ -271,7 +271,7 @@ def register(self, new_user: RegisterUserDto) -> GetUserDto:
 db_user.create_by = "register"
 33. we still get error and right now everyone should see that the error was too long let's use try catch and logging to minimize it update following code in main.py register function
 try:
-        user = user_service.register(new_user=new_user)
+        user = auth_service.register(new_user=new_user)
         return user
     except Exception as e:
         logger.error(e)
@@ -282,6 +282,109 @@ model_config = ConfigDict(from_attributes=True)
 
 35. we make update_by in model as optional but not in pydantic let's fix it
 update_by: str | None = None
+
+36. now we can register user and as you can see now every path is in the same file let's split it
+37. create controllers folder and following file
+character, auth
+
+38. move all the code to character and auth controllers
+
+39. and we also need APIRouter from fastapi
+from fastapi import Path, status, APIRouter
+
+40. define router
+router = APIRouter(
+    prefix="/characters",
+    tags=["characters"]
+)
+
+41. replace @app with @router
+
+42. remove all path /characters with /
+
+43. the same goes to auth
+
+44. the we combine it with app.include_router in main.py
+from .controllers import auth_controller, character_controller
+app.include_router(auth_controller.router)
+app.include_router(character_controller.router)
+
+45. next we're going to login our user 
+46. let's create read_by_username in user_repository
+def read_by_username(self, username: str) -> Users | None:
+    return self.db.query(Users).filter(Users.username == username).first()
+
+46. then create authenticate_user function in auth_service
+def authenticate_user(self, username: str, password: str) -> Users:
+        db_user = self.user_repo.read_by_username(username=username)
+        if db_user is None:
+            raise HTTPException(
+                status_code=401, detail=f"Not Authenticated")
+        if not self.auth.verify_password(
+            plain_password=password,
+            hashed_password=db_user.hashed_password
+        ):
+            raise HTTPException(
+                status_code=401, detail=f"Not Authenticated")
+        return db_user
+
+47. and then create create_access_token function in auth_repository
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+48. we need to install python-jose to handle jwt
+pip install "python-jose[cryptography]"
+pip install types-python-jose
+
+49. now we need SECRET_KEY and ALGORITHM to encode jwt let's create super secure secret key with openssl
+SECRET_KEY = "Super secret key"
+ALGORITHM = "HS256"
+
+50. let create auth_dtos.py
+class GetTokenDto(BaseModel):
+    access_token: str
+    token_type: str
+
+50. and then create login_for_access_token function in auth_service
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def login_for_access_token(
+        self,
+        username: str,
+        password: str
+    ) -> GetTokenDto:
+        db_user = self.authenticate_user(username=username, password=password)
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = self.auth.create_access_token(
+            data={"sub": db_user.username}, expires_delta=access_token_expires
+        )
+        response = GetTokenDto(
+            access_token=access_token,
+            token_type="bearer"
+        )
+        return response
+
+
+51. let's create token / login route 
+from fastapi.security import OAuth2PasswordRequestForm
+@router.post("/token")
+async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], auth_service: auth_service_dependency):
+    try:
+        result = auth_service.login_for_access_token(
+            username=form_data.username, password=form_data.password)
+        return result
+    except Exception as e:
+        logger.error(e)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 
 
 https://fastapi.tiangolo.com/async/#in-a-hurry
