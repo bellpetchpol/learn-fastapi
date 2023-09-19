@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta
 from jose import jwt
 from passlib.context import CryptContext
+from ..env import SECRET_KEY, SECURITY_ALGORITHM
 
-SECRET_KEY = "Super secret key"
-ALGORITHM = "HS256"
 
 
 class AuthRepository:
@@ -24,5 +23,7 @@ class AuthRepository:
             expire = datetime.utcnow() + timedelta(minutes=15)
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(
-            to_encode, SECRET_KEY, algorithm=ALGORITHM)
+            to_encode, SECRET_KEY, algorithm=SECURITY_ALGORITHM)
         return encoded_jwt
+    
+    

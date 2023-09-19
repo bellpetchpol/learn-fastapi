@@ -1,5 +1,5 @@
 from math import ceil
-from ..dependencies.dependencies import db_dependency
+from ..dependencies import db_dependency
 from ..models import Characters
 from ..dtos.character_dtos import UpdateCharacterDto
 from ..dtos.request_dtos import PageResponseDto

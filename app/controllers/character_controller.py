@@ -1,8 +1,8 @@
 from typing import Annotated
-from fastapi import Path, status, APIRouter
-from ..dependencies.service_dependencies import character_service_dependency
+from fastapi import Depends, Path, status, APIRouter
+from ..services.character_service import CharacterService
 from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
-from ..dependencies.dependencies import page_dependency
+from ..dependencies import page_dependency
 from ..dtos.request_dtos import PageResponseDto
 
 router = APIRouter(
@@ -10,6 +10,7 @@ router = APIRouter(
     tags=["characters"]
 )
 
+character_service_dependency = Annotated[CharacterService, Depends()]
 @router.get("/")
 async def read_all_character(
     character_service: character_service_dependency,

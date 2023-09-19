@@ -1,7 +1,7 @@
 from datetime import datetime
 from .database import Base
-from sqlalchemy import String, Enum, DateTime
-from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy import ForeignKey, String, Enum, DateTime
+from sqlalchemy.orm import mapped_column, Mapped, relationship
 from .dtos.character_dtos import CharacterRoleEnum
 
 
@@ -16,6 +16,9 @@ class Characters(Base):
     attack: Mapped[int]
     defence: Mapped[int]
     magic: Mapped[int]
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+
+    user: Mapped["Users"] = relationship(back_populates="characters")
 
     def __repr__(self) -> str:
         return f"Character(id={self.id}!r, name={self.name}!r, role={self.role.value}!r, hit_points={self.hit_points}!r, attack={self.attack}!r, defence={self.defence}!r, magic={self.magic}!r)"
@@ -31,10 +34,13 @@ class Users(Base):
     disabled: Mapped[bool] = mapped_column(default=False)
     create_by: Mapped[str] = mapped_column(String(25))
     create_date: Mapped[datetime] = mapped_column(DateTime(timezone=True),
-        default=datetime.utcnow())
+                                                  default=datetime.utcnow())
     update_by: Mapped[str | None] = mapped_column(String(25))
     update_date: Mapped[datetime] = mapped_column(DateTime(timezone=True),
-        default=datetime.utcnow())
+                                                  default=datetime.utcnow())
+
+    characters: Mapped[list["Characters"]
+                       ] = relationship(back_populates="user")
 
     def __repr__(self) -> str:
         return f"Users(id={self.id}!r, username={self.username}!r, full_name={self.full_name}!r, hashed_password={self.hashed_password}!r, disabled={self.disabled}!r, create_by={self.create_by}!r, create_date={self.create_date}!r, update_by={self.update_by}!r, update_date={self.update_date}!r)"

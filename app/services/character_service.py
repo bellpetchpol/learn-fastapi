@@ -1,13 +1,20 @@
-from fastapi import HTTPException
+from typing import Annotated
+from fastapi import Depends, HTTPException
 
 from ..models import Characters
 from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
-from ..dependencies.repository_dependencies import character_repository_dependency
 from ..dtos.request_dtos import PageResponseDto
+from ..repositories.character_repository import CharacterRepository
+from ..dependencies import auth_user_dependency
+
 
 class CharacterService:
-    def __init__(self, repo: character_repository_dependency):
+    def __init__(self,
+                 repo: Annotated[CharacterRepository, Depends()],
+                 auth_user: auth_user_dependency
+                 ):
         self.repo = repo
+        self.auth_user = auth_user
 
     def read_all(self, page: int, size: int) -> PageResponseDto[GetCharacterDto]:
         db_page_response = self.repo.read_all(page=page, size=size)
@@ -20,7 +27,8 @@ class CharacterService:
         #     pages=db_page_response.pages,
         #     total=db_page_response.total
         # )
-        page_response = PageResponseDto[GetCharacterDto](**db_page_response.model_dump())
+        page_response = PageResponseDto[GetCharacterDto](
+            **db_page_response.model_dump())
         return page_response
 
     def read_by_id(self, character_id: int) -> GetCharacterDto:
@@ -31,8 +39,9 @@ class CharacterService:
         return GetCharacterDto.model_validate(db_character)
 
     def add(self, new_character: AddCharacterDto) -> GetCharacterDto:
-        db_character = self.repo.add(
-            new_character=Characters(**new_character.model_dump()))
+        db_character = Characters(**new_character.model_dump())
+        db_character.user_id = self.auth_user.user_id
+        db_character = self.repo.add(new_character=db_character)
         character = GetCharacterDto.model_validate(db_character)
         return character
 

@@ -1,0 +1,30 @@
+1. add relation to User and Character
+1.1 in characters model add 
+user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+
+user: Mapped["Users"] = relationship(back_populates="Characters")
+
+1.2 in users model add 
+characters: Mapped[list["Characters"]
+                       ] = relationship(back_populates="Users")
+
+2. we need read_user_by_id so let's create it in user_repository
+def read_by_d(self, user_id: int) -> Users | None:
+        return self.db.query(Users).filter(Users.id == user_id).first()
+
+3. we also need it in service we don't have one alraedy so let's create user_service
+4. in character_service inject auth_user
+def __init__(self,
+                 repo: Annotated[CharacterRepository, Depends()],
+                 auth_user: auth_user_dependency
+                 ):
+        self.repo = repo
+        self.auth_user = auth_user
+
+5. edit add character to character_service
+def add(self, new_character: AddCharacterDto) -> GetCharacterDto:
+        db_character = Characters(**new_character.model_dump())
+        db_character.user_id = self.auth_user.user_id
+        db_character = self.repo.add(new_character=db_character)
+        character = GetCharacterDto.model_validate(db_character)
+        return character

@@ -4,8 +4,8 @@ from fastapi_pagination import Page, add_pagination
 from . import models
 from .database import engine
 
-from fastapi.security import OAuth2PasswordBearer
 from .controllers import auth_controller, character_controller
+from .dependencies import auth_user_dependency
 
 
 import logging
@@ -24,7 +24,7 @@ Page = Page.with_custom_options(# type: ignore[misc]
     size=Query(default=25, ge=1, le=100),
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 app = FastAPI()
 
@@ -35,8 +35,8 @@ models.Base.metadata.create_all(bind=engine)
 app.include_router(auth_controller.router)
 app.include_router(character_controller.router)
 
-@app.get("/token/")
-async def read_token(token: Annotated[str, Depends(oauth2_scheme)]):
-    return {"token": token}
+@app.get("/test-token/")
+async def read_token(auth_user: auth_user_dependency):
+    return auth_user
 
 

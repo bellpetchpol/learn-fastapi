@@ -1,4 +1,4 @@
-from ..dependencies.dependencies import db_dependency
+from ..dependencies import db_dependency
 from ..models import Users
 class UserRepository:
     
@@ -12,4 +12,7 @@ class UserRepository:
     
     def read_by_username(self, username: str) -> Users | None:
         return self.db.query(Users).filter(Users.username == username).first()
+    
+    def read_by_d(self, user_id: int) -> Users | None:
+        return self.db.query(Users).filter(Users.id == user_id).first()
          

@@ -317,7 +317,7 @@ def read_by_username(self, username: str) -> Users | None:
 46. then create authenticate_user function in auth_service
 def authenticate_user(self, username: str, password: str) -> Users:
         db_user = self.user_repo.read_by_username(username=username)
-        if db_user is None:
+        if db_user is None or db_user.disabled:
             raise HTTPException(
                 status_code=401, detail=f"Not Authenticated")
         if not self.auth.verify_password(
@@ -363,7 +363,10 @@ def login_for_access_token(
         db_user = self.authenticate_user(username=username, password=password)
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = self.auth.create_access_token(
-            data={"sub": db_user.username}, expires_delta=access_token_expires
+            data={
+                "sub": db_user.username,
+                "user_id": str(db_user.id)
+            }, expires_delta=access_token_expires
         )
         response = GetTokenDto(
             access_token=access_token,
@@ -383,6 +386,47 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], auth
     except Exception as e:
         logger.error(e)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+52. now we can login let's change api token in main to test-token and change tokenUrl to "/auth/token" and let's try on postman and swagger
+
+53. we're going to create get_current_user function as dependencies as it should be use almost every time api was call
+** we should also move constant data to environment variable
+import os
+
+SECRET_KEY = os.getenv("SECRET_KEY", "Super secret key")
+SECURITY_ALGORITHM = os.getenv("SECURITY_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES","30")
+
+---
+
+from fastapi import Depends, HTTPException, Query, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt
+from ..dtos.auth_dtos import CurrentUserDto
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
+def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> CurrentUserDto:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[SECURITY_ALGORITHM])
+        username: str = payload.get("sub")
+        user_id: int = payload.get("user_id")
+        if username is None or user_id is None:
+            raise credentials_exception
+        current_user = CurrentUserDto(username=username,user_id=user_id)
+    except JWTError:
+        raise credentials_exception
+    
+    return current_user
+
+auth_user_dependency = Annotated[CurrentUserDto, Depends(get_current_user)]
+
+54. let's try new dependencies in main.py
 
 
 

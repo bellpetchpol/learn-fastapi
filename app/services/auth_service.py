@@ -1,20 +1,24 @@
 from datetime import timedelta
-from ..dependencies.repository_dependencies import user_repository, auth_repository
+from typing import Annotated
+from ..repositories.user_repository import UserRepository
+from ..repositories.auth_repository import AuthRepository
 from ..dtos.user_dtos import RegisterUserDto, GetUserDto
 from ..dtos.auth_dtos import GetTokenDto
 from ..models import Users
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
 import logging
+from ..env import ACCESS_TOKEN_EXPIRE_MINUTES
 
 logger = logging.getLogger(__name__)  # the __name__ resolve to "app.services"
 # This will load the app logger
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
 
 class AuthService:
 
-    def __init__(self, user_repo: user_repository, auth: auth_repository):
+    def __init__(self,
+                 user_repo: Annotated[UserRepository, Depends()],
+                 auth: Annotated[AuthRepository, Depends()]
+                 ):
         self.user_repo = user_repo
         self.auth = auth
 
@@ -31,7 +35,7 @@ class AuthService:
 
     def authenticate_user(self, username: str, password: str) -> Users:
         db_user = self.user_repo.read_by_username(username=username)
-        if db_user is None:
+        if db_user is None or db_user.disabled:
             raise HTTPException(
                 status_code=401, detail=f"Not Authenticated")
         if not self.auth.verify_password(
@@ -48,9 +52,13 @@ class AuthService:
         password: str
     ) -> GetTokenDto:
         db_user = self.authenticate_user(username=username, password=password)
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token_expires = timedelta(
+            minutes=int(ACCESS_TOKEN_EXPIRE_MINUTES))
         access_token = self.auth.create_access_token(
-            data={"sub": db_user.username}, expires_delta=access_token_expires
+            data={
+                "sub": db_user.username,
+                "user_id": str(db_user.id)
+            }, expires_delta=access_token_expires
         )
         response = GetTokenDto(
             access_token=access_token,
