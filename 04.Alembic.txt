@@ -1,0 +1,25 @@
+1.we will use alembic to migrate database
+pip install alembic
+2. then run 
+alembic init alembic
+3. find alembic.ini and find sqlalchemy.url
+เราจะไป copy url มาจาก database.py
+4. then we going to alembic.eny.py file 
+5.look for the line
+target_metadata = None
+6. and change to 
+from app import models
+target_metadata = models.Base.metadata
+
+7. we will try to delete all the table in database 
+8. now let's create revision
+alembic revision --autogenerate -m "Initiate database"
+9. we will remove following line from main.py to prevent database auto generate while running the code
+models.Base.metadata.create_all(bind=engine)
+10. try run the code we will only see alembic version table
+11. run
+alembic upgrade [revision_number]
+or
+alembic upgrade head
+
+12. we will get error that enum object already exist so let's delete the database and recreate it 

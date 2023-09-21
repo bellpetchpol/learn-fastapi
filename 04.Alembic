@@ -1,3 +1,0 @@
-1.we will use alembic to migrate database
-pip install alembic
-alembic init alembic

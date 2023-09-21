@@ -30,7 +30,7 @@ app = FastAPI()
 
 add_pagination(app)
 
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine)
 
 app.include_router(auth_controller.router)
 app.include_router(character_controller.router)
