@@ -36,6 +36,7 @@ class AddCharacterDto(BaseModel):
 class GetCharacterDto(AddCharacterDto):
     model_config = ConfigDict(from_attributes=True)
     id: Annotated[int, Field(gt=0)]
+    user_id: Annotated[int, Field(gt=0)]
 
 
 class UpdateCharacterDto(BaseModel):

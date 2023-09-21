@@ -10,9 +10,12 @@ class CharacterRepository:
     def __init__(self, db: db_dependency):
         self.db = db
 
-    def read_all(self, page: int, size: int) -> PageResponseDto[Characters]:
+    def read_all(self, page: int, size: int, user_id: int) -> PageResponseDto[Characters]:
         offset = size * (page - 1)
-        query = self.db.query(Characters).order_by(Characters.id)
+        query = self.db.query(Characters)
+        if user_id is not None:
+            query = query.filter(Characters.user_id == user_id)
+        query = query.order_by(Characters.id)
         total = query.count()
         pages = ceil(total / size)
         
@@ -26,8 +29,11 @@ class CharacterRepository:
         
         return result
 
-    def read_by_id(self, character_id: int) -> Characters | None:
-        return self.db.query(Characters).filter(Characters.id == character_id).first()
+    def read_by_id(self, character_id: int, user_id: int) -> Characters | None:
+        query = self.db.query(Characters).filter(Characters.id == character_id)
+        if user_id is not None:
+            query = query.filter(Characters.user_id == user_id)
+        return query.first()
 
     def add(self, new_character: Characters) -> Characters:
         self.db.add(new_character)

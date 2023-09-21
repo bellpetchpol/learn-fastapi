@@ -28,3 +28,38 @@ def add(self, new_character: AddCharacterDto) -> GetCharacterDto:
         db_character = self.repo.add(new_character=db_character)
         character = GetCharacterDto.model_validate(db_character)
         return character
+
+6. we're going to delete our table and recreate it and when we try to login we're going to get weired error it's because we raise HTTPException in service but we have try catch in controller let's fix it
+
+try:
+        result = auth_service.login_for_access_token(
+            username=form_data.username, password=form_data.password)
+        return result
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(e)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+7. we can add characte now but we still don't see relate user_id let's update GetCharacterDto
+class GetCharacterDto(AddCharacterDto):
+    model_config = ConfigDict(from_attributes=True)
+    id: Annotated[int, Field(gt=0)]
+    user_id: Annotated[int, Field(gt=0)]
+
+8. next we're going to fix get character_by_id to return then character that belong to current user only
+8.1 update character_repository
+- in read_all
+query = self.db.query(Characters)
+        if user_id is not None:
+            query = query.filter(Characters.user_id == user_id)
+        query = query.order_by(Characters.id)
+
+- in read by id
+def read_by_id(self, character_id: int, user_id: int) -> Characters | None:
+        query = self.db.query(Characters).filter(Characters.id == character_id)
+        if user_id is not None:
+            query = query.filter(Characters.user_id == user_id)
+        return query.first()
+
+8.2 update character_service

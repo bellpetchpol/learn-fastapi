@@ -17,7 +17,8 @@ class CharacterService:
         self.auth_user = auth_user
 
     def read_all(self, page: int, size: int) -> PageResponseDto[GetCharacterDto]:
-        db_page_response = self.repo.read_all(page=page, size=size)
+        db_page_response = self.repo.read_all(
+            page=page, size=size, user_id=self.auth_user.user_id)
         # characters = [GetCharacterDto.model_validate(
         #     db_character) for db_character in db_page_response.items]
         # page_response = PageResponseDto[GetCharacterDto](
@@ -32,7 +33,8 @@ class CharacterService:
         return page_response
 
     def read_by_id(self, character_id: int) -> GetCharacterDto:
-        db_character = self.repo.read_by_id(character_id=character_id)
+        db_character = self.repo.read_by_id(
+            character_id=character_id, user_id=self.auth_user.user_id)
         if db_character is None:
             raise HTTPException(
                 status_code=404, detail=f"Character id: {character_id} not found")

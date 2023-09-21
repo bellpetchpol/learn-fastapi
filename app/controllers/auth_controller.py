@@ -35,6 +35,8 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], auth
         result = auth_service.login_for_access_token(
             username=form_data.username, password=form_data.password)
         return result
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.error(e)
         raise HTTPException(status_code=500, detail="Internal server error")
