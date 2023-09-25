@@ -24,6 +24,8 @@ async def register_user(
     try:
         user = auth_service.register(new_user=new_user)
         return user
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.error(e)
         raise HTTPException(status_code=500, detail="Internal server error")

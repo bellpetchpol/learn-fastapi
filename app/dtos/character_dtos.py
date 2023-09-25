@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field
+from .weapon_dtos import GetWeaponDto
+from .skill_dtos import GetSkillDto
 
 
 class CharacterRoleEnum(str, Enum):
@@ -37,6 +39,8 @@ class GetCharacterDto(AddCharacterDto):
     model_config = ConfigDict(from_attributes=True)
     id: Annotated[int, Field(gt=0)]
     user_id: Annotated[int, Field(gt=0)]
+    weapon: GetWeaponDto | None = None
+    skills: list[GetSkillDto] = []
 
 
 class UpdateCharacterDto(BaseModel):
@@ -46,3 +50,6 @@ class UpdateCharacterDto(BaseModel):
     attack: Annotated[int | None, Field(ge=5, le=20)]
     defence: Annotated[int | None, Field(ge=5, le=20)]
     magic: Annotated[int | None, Field(ge=5, le=20)]
+
+class AddCharacterSkillDto(BaseModel):
+    id: Annotated[int, Field(gt=0)]

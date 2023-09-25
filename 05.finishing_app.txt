@@ -1,0 +1,115 @@
+1.Now it's might be a good idea to check that the user is already exist let's add validation to auth service register
+db_user = self.user_repo.read_by_username(username=new_user.username)
+        if db_user is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "001",
+                    "message": f"The username {new_user.username} already exist."
+                }
+            )
+2. now let's try create existing user we will get 500 internal server error because we put try except on auth controller let's add exception clause
+except HTTPException as e:
+        raise e
+
+3. ok next our character need weapon let's create weapon table
+class Weapons(Base):
+    __tablename__ = "weapons"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(50))
+    damage: Mapped[int]
+
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id"))
+    character: Mapped["Characters"] = relationship(back_populates="weapon")
+    
+    def __repr__(self) -> str:
+        return f"Weapons(id={self.id}!r, name={self.name}, damage={self.damage}, character_id={self.character_id})"
+4. add more relation field to characters
+weapon: Mapped["Weapons"] = relationship(back_populates="character")
+
+5. try create migration file
+alembic revision --autogenerate -m "add weapon table"
+alembic upgrade head
+
+6. then we create add_weapon function in character_repository.py
+def add_weapon(self, db_character: Characters, new_weapon: Weapons) -> Characters:
+        db_character.weapon = new_weapon
+        self.db.add(db_character)
+        self.db.commit()
+        return db_character
+
+7. we're going to create add_weapon function in service but first we need weapon_dtos let's create it first
+from pydantic import BaseModel, Field
+from typing import Annotated
+
+
+class AddWeaponDto(BaseModel):
+    name: Annotated[str, Field(max_length=50)]
+    damage: Annotated[int, Field(gt=0)]
+
+8. then add_weapon function in service
+def add_weapon(self, character_id: int, new_weapon: AddWeaponDto) -> GetCharacterDto:
+        db_character = self.read_by_id_return_db_character(
+            character_id=character_id)
+        db_character = self.repo.add_weapon(
+            db_character=db_character,
+            new_weapon=Weapons(**new_weapon.model_dump())
+        )
+        character = GetCharacterDto.model_validate(db_character)
+        return character
+
+9. add controller
+@router.put("/{character_id}/add-weapon")
+async def update_character_weapon(
+    character_id: Annotated[int, Path(gt=0)],
+    new_weapon: AddWeaponDto,
+    character_service: character_service_dependency
+) -> GetCharacterDto:
+    return character_service.add_weapon(
+        character_id=character_id, new_weapon=new_weapon)
+
+10. the result will not contain weapon in GetCharacterDto let's add it
+class GetWeaponDto(AddWeaponDto):
+    model_config = ConfigDict(from_attributes=True)
+    pass
+
+class GetCharacterDto(AddCharacterDto):
+    model_config = ConfigDict(from_attributes=True)
+    id: Annotated[int, Field(gt=0)]
+    user_id: Annotated[int, Field(gt=0)]
+    weapon: GetWeaponDto | None = None
+
+11. finally add join to query
+def read_by_id(self, character_id: int, user_id: int) -> Characters | None:
+        query = self.db.query(Characters).filter(Characters.id == character_id)
+        if user_id is not None:
+            query = query.filter(Characters.user_id == user_id)
+        query = query.outerjoin(Characters.weapon)
+        return query.first()
+
+12. next we will create skill table which is many to many relationship to character add following code in models.py
+character_skill_table = Table(
+    "characters_skills",
+    Base.metadata,
+    Column("id", type_=Integer, primary_key=True, index=True),
+    Column("character_id", ForeignKey("characters.id")),
+    Column("skill_id", ForeignKey("skills.id"))
+) 
+
+inside characters model
+skills: Mapped[list["Skills"]] = relationship(secondary=character_skill_table)
+
+class Skills(Base):
+    __tablename__ = "skills"
+    
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(50))
+    damage: Mapped[int]
+
+13. run 
+alembic revision --autogenerate -m "add weapon table"
+alembic upgrade head
+
+14. then we create skill repository service  route
+15. add skill to character

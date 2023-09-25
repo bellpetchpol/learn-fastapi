@@ -5,7 +5,7 @@ from ..repositories.auth_repository import AuthRepository
 from ..dtos.user_dtos import RegisterUserDto, GetUserDto
 from ..dtos.auth_dtos import GetTokenDto
 from ..models import Users
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, status
 import logging
 from ..env import ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -23,6 +23,15 @@ class AuthService:
         self.auth = auth
 
     def register(self, new_user: RegisterUserDto) -> GetUserDto:
+        db_user = self.user_repo.read_by_username(username=new_user.username)
+        if db_user is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "001",
+                    "message": f"The username {new_user.username} already exist."
+                }
+            )
         user_dict = new_user.model_dump()
         user_dict.pop("password")
         db_user = Users(**user_dict)

@@ -1,43 +1,43 @@
 from typing import Annotated
 from fastapi import Depends, HTTPException
 
-from ..models import Characters
+from ..models import Characters, Weapons
 from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
 from ..dtos.request_dtos import PageResponseDto
 from ..repositories.character_repository import CharacterRepository
+from ..repositories.skill_repository import SkillRepository
 from ..dependencies import auth_user_dependency
+from ..dtos.weapon_dtos import AddWeaponDto
 
 
 class CharacterService:
     def __init__(self,
                  repo: Annotated[CharacterRepository, Depends()],
-                 auth_user: auth_user_dependency
+                 auth_user: auth_user_dependency,
+                 skill_repo: Annotated[SkillRepository, Depends()]
                  ):
         self.repo = repo
         self.auth_user = auth_user
+        self.skill_repo = skill_repo
 
     def read_all(self, page: int, size: int) -> PageResponseDto[GetCharacterDto]:
         db_page_response = self.repo.read_all(
             page=page, size=size, user_id=self.auth_user.user_id)
-        # characters = [GetCharacterDto.model_validate(
-        #     db_character) for db_character in db_page_response.items]
-        # page_response = PageResponseDto[GetCharacterDto](
-        #     items=characters,
-        #     page=db_page_response.page,
-        #     size=db_page_response.size,
-        #     pages=db_page_response.pages,
-        #     total=db_page_response.total
-        # )
         page_response = PageResponseDto[GetCharacterDto](
             **db_page_response.model_dump())
         return page_response
 
-    def read_by_id(self, character_id: int) -> GetCharacterDto:
+    def read_by_id_return_db_character(self, character_id: int) -> Characters:
         db_character = self.repo.read_by_id(
             character_id=character_id, user_id=self.auth_user.user_id)
         if db_character is None:
             raise HTTPException(
                 status_code=404, detail=f"Character id: {character_id} not found")
+        return db_character
+
+    def read_by_id(self, character_id: int) -> GetCharacterDto:
+        db_character = self.read_by_id_return_db_character(
+            character_id=character_id)
         return GetCharacterDto.model_validate(db_character)
 
     def add(self, new_character: AddCharacterDto) -> GetCharacterDto:
@@ -47,11 +47,33 @@ class CharacterService:
         character = GetCharacterDto.model_validate(db_character)
         return character
 
-    def update(self, character_id: int, update_character: UpdateCharacterDto) -> GetCharacterDto:
-        db_character = self.repo.read_by_id(character_id=character_id)
-        if db_character is None:
+    def add_weapon(self, character_id: int, new_weapon: AddWeaponDto) -> GetCharacterDto:
+        db_character = self.read_by_id_return_db_character(
+            character_id=character_id)
+        db_character = self.repo.add_weapon(
+            db_character=db_character,
+            new_weapon=Weapons(**new_weapon.model_dump())
+        )
+        character = GetCharacterDto.model_validate(db_character)
+        return character
+
+    def add_skill(self, character_id: int, skill_id: int) -> GetCharacterDto:
+        db_character = self.read_by_id_return_db_character(
+            character_id=character_id)
+        db_skill = self.skill_repo.read_by_id(skill_id=skill_id)
+        if db_skill is None:
             raise HTTPException(
-                status_code=404, detail=f"Character id: {character_id} not found")
+                status_code=404, detail=f"Skill id: {skill_id} not found")
+        db_character = self.repo.add_skill(
+            db_character=db_character,
+            db_skill=db_skill
+        )
+        character = GetCharacterDto.model_validate(db_character)
+        return character
+
+    def update(self, character_id: int, update_character: UpdateCharacterDto) -> GetCharacterDto:
+        db_character = self.read_by_id_return_db_character(
+            character_id=character_id)
         updated_db_character = self.repo.update(
             db_character=db_character, update_character=update_character
         )
@@ -59,8 +81,6 @@ class CharacterService:
         return result
 
     def delete(self, character_id: int) -> None:
-        db_character = self.repo.read_by_id(character_id=character_id)
-        if db_character is None:
-            raise HTTPException(
-                status_code=404, detail=f"Character id: {character_id} not found")
+        db_character = self.read_by_id_return_db_character(
+            character_id=character_id)
         self.repo.delete(db_character=db_character)

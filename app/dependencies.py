@@ -34,7 +34,7 @@ def page_parameter(
 
 page_dependency = Annotated[PageRequestDto, Depends(page_parameter)]
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> CurrentUserDto:
     credentials_exception = HTTPException(
