@@ -113,3 +113,84 @@ alembic upgrade head
 
 14. then we create skill repository service  route
 15. add skill to character
+
+16. we will create dummy skill for skills table let's add it in skill_service.py
+def add_dummy(self) -> None:
+        skills = [
+            AddSkillDto(
+                name="ลูกบอลไฟ",
+                damage=30
+            ),
+            AddSkillDto(
+                name="สายฟ้าฟาด",
+                damage=35
+            ),
+            AddSkillDto(
+                name="พายุน้ำแข็ง",
+                damage=40
+            )
+        ]
+        
+        for skill in skills:
+            self.add(skill)
+
+17. and in skill_controller
+@router.post("/dummy", status_code=201)
+async def add_dummy(skill_service: skill_service) -> None:
+    skill_service.add_dummy()
+
+18. dummy character
+def randint_hp(self) -> int:
+        return randint(100, 150)
+
+    def randint_attack(self) -> int:
+        return randint(10, 20)
+
+    def randint_defence(self) -> int:
+        return randint(5, 25)
+
+    def randint_magic(self) -> int:
+        return randint(5, 20)
+
+    def dummy_character(self, character_name: str) -> AddCharacterDto:
+        character_choices = [CharacterRoleEnum.Knight,
+                             CharacterRoleEnum.Mage, CharacterRoleEnum.Cleric]
+        return AddCharacterDto(
+            name=character_name,
+            role=choice(character_choices),
+            hit_points=self.randint_hp(),
+            attack=self.randint_attack(),
+            defence=self.randint_defence(),
+            magic=self.randint_magic()
+        )
+
+    def dummy_weapon(self) -> AddWeaponDto:
+        weapons = [
+            AddWeaponDto(name="ดาบ", damage=10),
+            AddWeaponDto(name="หอก", damage=12),
+            AddWeaponDto(name="โซ่", damage=11),
+            AddWeaponDto(name="แส้", damage=9)
+        ]
+        return weapons[randint(0, 3)]
+
+    def dummy(self) -> None:
+
+        characters = [
+            self.dummy_character("พี่เบล"),
+            self.dummy_character("โน้ตซ่า"),
+            self.dummy_character("เทค"),
+            self.dummy_character("จั้ม"),
+            self.dummy_character("โอลิเวีย"),
+            self.dummy_character("แอลเค"),
+            self.dummy_character("ยูอิ")
+        ]
+        
+        for character in characters:
+            db_character = self.add(character)
+            self.add_weapon(db_character.id, self.dummy_weapon())
+            weapon_set = set()
+            for x in range(0,3):
+                y = randint(0,2) + 1
+                weapon_set.add(y)
+            for weapon_id in weapon_set:
+                self.add_skill(db_character.id, weapon_id)

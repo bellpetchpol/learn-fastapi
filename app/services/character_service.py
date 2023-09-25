@@ -2,12 +2,13 @@ from typing import Annotated
 from fastapi import Depends, HTTPException
 
 from ..models import Characters, Weapons
-from ..dtos.character_dtos import AddCharacterDto, GetCharacterDto, UpdateCharacterDto
+from ..dtos.character_dtos import AddCharacterDto, CharacterRoleEnum, GetCharacterDto, UpdateCharacterDto
 from ..dtos.request_dtos import PageResponseDto
 from ..repositories.character_repository import CharacterRepository
 from ..repositories.skill_repository import SkillRepository
 from ..dependencies import auth_user_dependency
 from ..dtos.weapon_dtos import AddWeaponDto
+from random import randint, choice
 
 
 class CharacterService:
@@ -84,3 +85,58 @@ class CharacterService:
         db_character = self.read_by_id_return_db_character(
             character_id=character_id)
         self.repo.delete(db_character=db_character)
+
+    def randint_hp(self) -> int:
+        return randint(100, 150)
+
+    def randint_attack(self) -> int:
+        return randint(10, 20)
+
+    def randint_defence(self) -> int:
+        return randint(5, 25)
+
+    def randint_magic(self) -> int:
+        return randint(5, 20)
+
+    def dummy_character(self, character_name: str) -> AddCharacterDto:
+        character_choices = [CharacterRoleEnum.Knight,
+                             CharacterRoleEnum.Mage, CharacterRoleEnum.Cleric]
+        return AddCharacterDto(
+            name=character_name,
+            role=choice(character_choices),
+            hit_points=self.randint_hp(),
+            attack=self.randint_attack(),
+            defence=self.randint_defence(),
+            magic=self.randint_magic()
+        )
+
+    def dummy_weapon(self) -> AddWeaponDto:
+        weapons = [
+            AddWeaponDto(name="ดาบ", damage=10),
+            AddWeaponDto(name="หอก", damage=12),
+            AddWeaponDto(name="โซ่", damage=11),
+            AddWeaponDto(name="แส้", damage=9)
+        ]
+        return weapons[randint(0, 3)]
+
+    def dummy(self) -> None:
+
+        characters = [
+            self.dummy_character("พี่เบล"),
+            self.dummy_character("โน้ตซ่า"),
+            self.dummy_character("เทค"),
+            self.dummy_character("จั้ม"),
+            self.dummy_character("โอลิเวีย"),
+            self.dummy_character("แอลเค"),
+            self.dummy_character("ยูอิ")
+        ]
+        
+        for character in characters:
+            db_character = self.add(character)
+            self.add_weapon(db_character.id, self.dummy_weapon())
+            weapon_set = set()
+            for x in range(0,3):
+                y = randint(0,2) + 1
+                weapon_set.add(y)
+            for weapon_id in weapon_set:
+                self.add_skill(db_character.id, weapon_id)

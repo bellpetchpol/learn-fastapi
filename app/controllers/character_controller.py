@@ -76,3 +76,7 @@ async def delete_character(
     character_service: character_service_dependency
 ) -> None:
     character_service.delete(character_id=character_id)
+    
+@router.post("/dummy", status_code=201)
+async def add_dummy(character_service: character_service_dependency) -> None:
+    character_service.dummy()

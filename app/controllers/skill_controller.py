@@ -33,3 +33,7 @@ async def add_skill(
 ) -> GetSkillDto:
     result = skill_service.add(new_skill=new_skill)
     return result
+
+@router.post("/dummy", status_code=201)
+async def add_dummy(skill_service: skill_service) -> None:
+    skill_service.add_dummy()

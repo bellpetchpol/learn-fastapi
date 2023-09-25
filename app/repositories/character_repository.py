@@ -79,3 +79,4 @@ class CharacterRepository:
     def delete(self, db_character: Characters) -> None:
         self.db.delete(db_character)
         self.db.commit()
+        
