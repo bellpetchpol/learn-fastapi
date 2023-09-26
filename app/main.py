@@ -4,7 +4,7 @@ from fastapi_pagination import Page, add_pagination
 from . import models
 from .database import engine
 
-from .controllers import auth_controller, character_controller, skill_controller
+from .controllers import auth_controller, character_controller, skill_controller, fight_controller
 from .dependencies import auth_user_dependency
 
 
@@ -35,7 +35,7 @@ add_pagination(app)
 app.include_router(auth_controller.router)
 app.include_router(character_controller.router)
 app.include_router(skill_controller.router)
-
+app.include_router(fight_controller.router)
 @app.get("/test-token/")
 async def read_token(auth_user: auth_user_dependency):
     return auth_user
