@@ -49,12 +49,15 @@ class FightService:
                     # skill = skills[randint(0, len(skills) - 1)]
                     damage = attacker.magic + skill.damage
                     attack_with = skill.name
-
-                defender.hit_points -= damage
+                if damage - defender.defence < 0:
+                    total_damage = 0
+                else:
+                    total_damage = damage - defender.defence
+                defender.hit_points -= total_damage
                 result = GetResultDto(
                     attacker=f"{attacker.name} HP {attacker.hit_points}",
                     defender=f"{defender.name} HP {defender.hit_points}",
-                    message=f"{attacker.name} ใช้ {attack_with} โจมตี {defender.name} สร้างความเสียหาย {damage}"
+                    message=f"{attacker.name} ใช้ {attack_with} ({damage}) โจมตี {defender.name} ({defender.defence}) สร้างความเสียหาย {total_damage}"
                 )
                 index = 0
                 for character in players:
@@ -63,7 +66,7 @@ class FightService:
                         if character.hit_points <= 0:
                             players.pop(index)
                     index += 1
-                    
+
                 if defender.hit_points <= 0:
                     result.message += " ถึงตาย!"
 
